@@ -12,25 +12,39 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                             QTableWidget, QTableWidgetItem, QHeaderView)
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize
 from PyQt5.QtGui import QColor, QPalette, QBrush, QLinearGradient
+from pythonping import ping as py_ping
 
 default_scan_ip = '192.168.1.0/24'
 
+def _tcp_probe(ip, ports=(80, 443, 22, 3389), timeout_ms=300):
+    timeout_s = max(0.05, timeout_ms / 1000.0)
+    for port in ports:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(timeout_s)
+        try:
+            s.connect((str(ip), port))
+            s.close()
+            return True  # 直接连通，主机在线
+        except ConnectionRefusedError:
+            s.close()
+            return True  # 被拒绝也表示主机可达
+        except OSError as e:
+            s.close()
+            # Windows 下 ECONNREFUSED=10061，认为主机在线
+            if getattr(e, 'errno', None) in (errno.ECONNREFUSED, 10061):
+                return True
+            # 超时或网络不可达则继续尝试下个端口
+        except Exception:
+            s.close()
+    return False
+
 def ping(ip):
     """
-    对指定IP执行ping操作，如果能ping通则返回True，否则返回False
+    使用第三方库 pythonping 执行 ICMP 探测，返回是否可达
     """
     try:
-        # 针对Windows系统的ping命令，使用-n参数指定发送次数，-w指定超时时间(毫秒)
-        output = subprocess.run(
-            ["ping", "-n", "1", "-w", "500", str(ip)],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            timeout=1
-        )
-        return output.returncode == 0
-    except subprocess.TimeoutExpired:
-        return False
+        resp = py_ping(str(ip), count=1, timeout=0.5, size=32)
+        return resp.success()
     except Exception as e:
         print(f"Ping {ip} 时出错: {e}")
         return False
