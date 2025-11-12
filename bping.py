@@ -13,8 +13,21 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize
 from PyQt5.QtGui import QColor, QPalette, QBrush, QLinearGradient
 from pythonping import ping as py_ping
+import os
+import io
+import platform
 
 default_scan_ip = '192.168.1.0/24'
+
+
+def change_default_encoding():
+    """判断是否在 windows git-bash 下运行，是则使用 utf-8 编码"""
+    if platform.system() == 'Windows':
+        terminal = os.environ.get('TERM')
+        if terminal and 'xterm' in terminal:
+            sys.stdin = io.TextIOWrapper(sys.stdin.buffer, encoding='utf-8')
+            sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+
 
 def _tcp_probe(ip, ports=(80, 443, 22, 3389), timeout_ms=300):
     timeout_s = max(0.05, timeout_ms / 1000.0)
@@ -435,6 +448,7 @@ def scan_network(network, max_workers=50):
     return active_ips
 
 def main():
+    change_default_encoding()
     # 检查命令行参数
     if len(sys.argv) > 1:
         # 命令行模式
